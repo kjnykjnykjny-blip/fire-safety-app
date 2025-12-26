@@ -124,4 +124,138 @@ with tab1:
             red_rate = 0.0
             if not has_sp: red_rate += 0.1
             if not has_sm: red_rate += 0.1
-            if not has_wa
+            if not has_wa: red_rate += 0.1
+            dist_pen = (dist_km / 5) * 0.02
+            total_pen = red_rate + dist_pen
+            
+            std = LIMITS[inspection_type]
+            
+            st.markdown(f"**{target_name} ({selected_usage})**")
+            
+            best_sub = -1
+            best_ratio = 0
+            
+            for sub in range(0, 6):
+                capa_area = (std["area_base"] + sub*std["area_inc"]) * (1.0 - total_pen)
+                capa_apt = (std["apt_base"] + sub*std["apt_inc"]) * (1.0 - total_pen)
+                
+                usage = 0.0
+                if capa_area > 0: usage += load_area / capa_area
+                if capa_apt > 0: usage += load_apt / capa_apt
+                
+                if usage <= 1.0:
+                    best_sub = sub
+                    best_ratio = usage
+                    break
+            
+            if best_sub != -1:
+                st.success(f"✅ [관리사 1명 + 보조 {best_sub}명] (1일)")
+                st.progress(best_ratio, text=f"부하율: {best_ratio*100:.1f}%")
+                st.caption(f"*복합용도 부하율 계산됨 ({load_area:.0f}/{capa_area:.0f} + {load_apt}/{capa_apt:.0f})")
+            else:
+                st.error("❌ 1일 점검 불가 (2일 소요)")
+
+# ==========================================
+# [탭 2] 공사 견적 (수정됨: 실제 공사비 산출)
+# ==========================================
+with tab2:
+    st.header("🔨 공사 견적서 산출")
+    st.caption("지적사항에 대한 보수 공사 비용을 계산합니다.")
+    
+    col_e1, col_e2 = st.columns([1, 1])
+    
+    with col_e1:
+        st.subheader("항목 추가")
+        item_name = st.text_input("공사명/품명", placeholder="예: 펌프 메카니컬 씰 교체")
+        
+        c_cost1, c_cost2 = st.columns(2)
+        mat_cost = c_cost1.number_input("재료비 (원)", value=0, step=1000)
+        lab_cost = c_cost2.number_input("노무비 (원)", value=0, step=10000)
+        
+        count = st.number_input("수량", value=1, min_value=1)
+        
+        if st.button("견적 항목 추가"):
+            if item_name:
+                total = (mat_cost + lab_cost) * count
+                st.session_state.estimate_items.append({
+                    "품명": item_name,
+                    "재료비": mat_cost,
+                    "노무비": lab_cost,
+                    "수량": count,
+                    "합계": total
+                })
+                st.success("추가됨")
+            else:
+                st.warning("품명을 입력하세요")
+
+    with col_e2:
+        st.subheader("💰 견적서 미리보기")
+        
+        # 할증 옵션 (아까 말씀하신 부분)
+        st.write("**작업 조건 할증**")
+        chk_night = st.checkbox("야간 작업 (노무비 50% 할증)")
+        chk_high = st.checkbox("고소 작업/사다리차 사용 (별도 비용)")
+        ladder_cost = 0
+        if chk_high:
+            ladder_cost = st.number_input("사다리차 비용 (원)", value=150000, step=10000)
+        
+        st.markdown("---")
+        
+        if len(st.session_state.estimate_items) > 0:
+            df_est = pd.DataFrame(st.session_state.estimate_items)
+            st.dataframe(df_est, hide_index=True)
+            
+            # 총계 계산
+            sum_mat = df_est["재료비"].sum() * df_est["수량"].sum() # 단순합계가 아니라 행별 계산 필요하지만 약식
+            # 정확한 합계 재계산
+            total_mat = 0
+            total_lab = 0
+            for item in st.session_state.estimate_items:
+                total_mat += item["재료비"] * item["수량"]
+                total_lab += item["노무비"] * item["수량"]
+            
+            if chk_night:
+                total_lab = int(total_lab * 1.5)
+                st.caption("※ 야간 할증 적용됨")
+                
+            final_total = total_mat + total_lab + ladder_cost
+            
+            st.write(f"**- 재료비 소계:** {total_mat:,} 원")
+            st.write(f"**- 노무비 소계:** {total_lab:,} 원")
+            if chk_high:
+                st.write(f"**- 장비비(사다리):** {ladder_cost:,} 원")
+            
+            st.markdown("### 🧾 총 견적금액: " + f":blue[{final_total:,} 원]")
+            
+            if st.button("견적 초기화"):
+                st.session_state.estimate_items = []
+                st.rerun()
+        else:
+            st.info("왼쪽에서 항목을 추가해주세요.")
+
+# ==========================================
+# [탭 3] 지적 관리 (자동저장 유지)
+# ==========================================
+with tab3:
+    st.header("📝 지적내역서 (자동 저장)")
+    
+    col_in, col_list = st.columns([1, 1.5])
+    
+    with col_in:
+        d_code = st.text_input("점검 코드 (PDF 기준)", placeholder="예: 32-C-021")
+        
+        auto_msg = DEFECT_DB.get(d_code, "")
+        if auto_msg: st.success(f"매칭: {auto_msg}")
+            
+        d_loc = st.text_input("위치", placeholder="예: 1층 로비")
+        d_desc = st.text_area("내용", value=auto_msg, height=100)
+        
+        if st.button("지적사항 추가"):
+            if d_desc:
+                st.session_state.defects_list.append(
+                    {"코드": d_code, "위치": d_loc, "내용": d_desc}
+                )
+    
+    with col_list:
+        if st.session_state.defects_list:
+            st.dataframe(pd.DataFrame(st.session_state.defects_list), hide_index=True)
