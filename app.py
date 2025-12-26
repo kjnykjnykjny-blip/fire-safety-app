@@ -12,6 +12,7 @@ LIMITS = {
 }
 
 # [2] 용도 리스트 (협회 기준)
+#의 1류, 2류 구분 반영
 USAGE_OPTIONS = {
     "1류": [
         "[1류] 복합건축물 (근생+주거 등)", 
@@ -46,12 +47,14 @@ def get_k_factor(selected_text):
     return 1.0
 
 # [3] 점검 항목 DB (자동완성용)
+#, 내용 반영
 DEFECT_DB = {
-    "1-A-003": "소화기 미비치 (보행거리 초과)",
-    "1-A-007": "소화기 충압 불량 (게이지 불량)",
-    "32-C-021": "유도등 상시 점등 불량 (3선식 포함)",
-    "32-C-022": "유도등 시각장애 발생 (가려짐 등)",
-    "32-C-023": "유도등 예비전원 불량 (배터리 방전)",
+    "1-A-003": "소화기 미비치로 비치요함 (보행거리)",
+    "1-A-007": "소화기 충압불량으로 교체요함",
+    "1-A-008": "소화기 내용연수 경과로 교체요함",
+    "32-C-021": "유도등 상시 (3선식의 경우 점검스위치 작동시) 점등 불량",
+    "32-C-022": "유도등 시각장애(장애물 등으로 인한 시각장애 유무) 여부",
+    "32-C-023": "비상전원 성능 적정 및 상용전원 차단 시 예비전원 자동전환 불량",
     "P-001": "소화전 펌프 기동 불량 (압력스위치 확인 요)",
     "S-001": "준비작동식 밸브(프리액션) 솔레노이드 고장",
     "D-001": "감지기 선로 단선 (발신기 LED 미점등)"
@@ -246,3 +249,18 @@ with tab3:
         if auto_msg: st.info(f"매칭: {auto_msg}")
             
         d_loc = st.text_input("위치", placeholder="예: 1층")
+        d_desc = st.text_area("내용", value=auto_msg, height=100)
+        
+        if st.button("지적사항 저장"):
+            if d_desc:
+                st.session_state.defects_list.append(
+                    {"코드": d_code, "위치": d_loc, "내용": d_desc}
+                )
+                st.success("저장됨")
+    
+    with col_list:
+        if st.session_state.defects_list:
+            st.dataframe(pd.DataFrame(st.session_state.defects_list), hide_index=True)
+            if st.button("리스트 비우기"):
+                st.session_state.defects_list = []
+                st.rerun()
