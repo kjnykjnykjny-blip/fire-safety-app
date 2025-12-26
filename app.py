@@ -11,7 +11,8 @@ LIMITS = {
     "작동": {"area_base": 10000, "area_inc": 2500, "apt_base": 250, "apt_inc": 60}
 }
 
-# [2] 용도 리스트 (협회 기준 상세)
+# [2] 용도 리스트 (협회 기준)
+#의 1류, 2류 구분 반영
 USAGE_OPTIONS = {
     "1류": [
         "[1류] 복합건축물 (근생+주거 등)", 
@@ -46,6 +47,7 @@ def get_k_factor(selected_text):
     return 1.0
 
 # [3] 점검 항목 DB (자동완성용)
+#, 내용 반영
 DEFECT_DB = {
     "1-A-003": "소화기 미비치로 비치요함 (보행거리)",
     "1-A-007": "소화기 충압불량으로 교체요함",
@@ -86,7 +88,6 @@ with tab1:
                 st.success(f"{len(df)}개 로딩됨")
             except: pass
 
-    # 좌우 나누기
     c1, c2 = st.columns(2)
     
     with c1:
@@ -123,7 +124,7 @@ with tab1:
             load_area = input_area * k_factor
             load_apt = input_apt
             
-            # 감산 적용 (오류 수정된 부분)
+            # 감산 적용 (에러 났던 부분 수정완료: 콜론 추가)
             red_rate = 0.0
             if not has_sp:
                 red_rate += 0.1
